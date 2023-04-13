@@ -81,11 +81,17 @@ if [ "$r_key" = true ]; then
     pip freeze
 fi
 
-echo "docker build -t latest . :"
-docker build -t latest .
+echo "docker build -t myparts_ge . :"
+docker build -t myparts_ge .
 
-echo "docker run --rm -it -v $(pwd)/app:/app latest bash :"
-docker run --rm -it -v $(pwd)/app:/root/app latest bash
+echo "source ./connect_vnc.sh &:"
+source ./connect_vnc.sh &
+
+echo "docker run --rm -it "
+echo "      -v $(pwd)/app:/root/app"
+echo "      -p 5900:5900 "
+echo "            myparts_ge bash :"
+docker run --rm -it -v $(pwd)/app:/root/app -p 5900:5900 myparts_ge bash
 
 echo "Changing directory to: $start_dir"
 cd "$start_dir" || err_exit $?
