@@ -1,15 +1,43 @@
 import os
-import time
-import configparser
 import sys
+import time
+import itertools
+import configparser
+import undetected_chromedriver as uc
+from fake_useragent import UserAgent
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 from logging import Logger
 
 
+class ProxyRotator:
+    def __init__(self, proxies):
+        # create iterator, which will cycle through the proxies
+        self.proxies = itertools.cycle(proxies)
+        self.current_proxy = None
+        self.good_proxy = {}
+        # counter of request to change proxy
+        self.request_counter = 0
+
+    def change_proxy(self):
+        # Change the proxy to the next one and reset the counter
+        self.current_proxy = next(self.proxies)
+        self.request_counter = 0
+        return self.current_proxy
+
+    def get_proxy(self):
+        # check if the proxy has to be changed ("2" means change after every second request)
+        if self.request_counter % 2 == 0:
+            self.change_proxy()
+        self.request_counter += 1
+        return self.current_proxy
+
+
 class SeleniumHandler:
 
     def __init__(self, config_file, logger: Logger = None):
+        self.browser = None
+
         print("Initializing Browser Instance!")
         if logger is not None:
             self.logger = logger
@@ -29,23 +57,71 @@ class SeleniumHandler:
         if self.logger is not None:
             self.logger.debug("driver_path: %s", driver_path)
 
-        option = webdriver.ChromeOptions()
-        # option.binary_location = browser_path
+        self.initialize()
+
+    def initialize(self):
+        self.browser = None
+        options = uc.ChromeOptions()
         if self.config.get('OPTIONS', 'headless') == 'YES':
-            option.add_argument("--headless")
+            options.add_argument("--headless")
             if self.logger is not None:
                 self.logger.debug("--headless mode enabled")
 
         if self.config.get('OPTIONS', 'incognito') == 'YES':
-            option.add_argument("--incognito")
+            options.add_argument("--incognito")
             if self.logger is not None:
                 self.logger.debug("--incognito mode enabled")
 
+        if self.config.get('OPTIONS', 'no-sandbox') == 'YES':
+            options.add_argument("--no-sandbox")
+            if self.logger is not None:
+                self.logger.debug("--no-sandbox mode enabled")
+
+        if self.config.get('OPTIONS', 'random_ua') == 'YES':
+            ua = UserAgent()
+            options.add_argument(f'user-agent={ua.random}')
+            if self.logger is not None:
+                self.logger.debug("user-agent is randomized")
+
+        # if self.config.get('OPTIONS', 'use_proxy') == 'YES':
+        #     ua = UserAgent()
+        #     options.add_argument(f'user-agent={ua.random}')
+        #     if self.logger is not None:
+        #         self.logger.debug("user-agent is randomized")
+
+        if self.config.get('OPTIONS', 'disable-setuid-sandbox') == 'YES':
+            options.add_argument(f'--disable-setuid-sandbox')
+            if self.logger is not None:
+                self.logger.debug("--disable-setuid-sandbox")
+
+        if self.config.get('OPTIONS', 'ignore-certificate-errors') == 'YES':
+            options.add_argument(f'--ignore-certificate-errors')
+            if self.logger is not None:
+                self.logger.debug("--ignore-certificate-errors")
+
+        browser_executable_path = self.config.get('OPTIONS', 'browser_executable_path')
+
         # Create new Instance of Browser
-        self.browser = webdriver.Chrome(options=option)
+        self.browser = uc.Chrome(browser_executable_path=browser_executable_path, options=options)
         print("Browser has been initialized!")
         if self.logger is not None:
             self.logger.info("Browser has been initialized!")
+
+    def reinitialize(self):
+        print("Reinitializing Browser Instance!")
+        if self.logger is not None:
+            self.logger.info("Reinitializing Browser Instance!")
+
+        try:
+            self.quit_browser()
+        except Exception as _ex:
+            print(f"[ERROR] Closing | Exception: {_ex}")
+
+        time.sleep(2)
+        self.initialize()
+
+        if self.logger is not None:
+            self.logger.info("Browser has been reinitialized")
 
     def quit_browser(self):
         print("Quitting Browser Instance!")
@@ -90,6 +166,7 @@ class SeleniumHandler:
                 self.logger.info("Login Failed!")
                 self.logger.info(f"Current URL: {self.browser.current_url}")
             # exit(1)
+
 
 
 if __name__ == '__main__':

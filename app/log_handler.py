@@ -11,7 +11,7 @@ class LogHandler:
     def __init__(self, config_file, name=__name__):
         self._name = name
         self.logger = logging.getLogger(self._name)
-        print(type(self.logger))
+        # print(type(self.logger))
 
         if os.path.exists(config_file):
             self.load_config(config_file)

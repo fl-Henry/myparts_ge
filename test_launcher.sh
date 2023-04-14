@@ -10,6 +10,8 @@ err_exit(){
 
 # Get the option
 r_key=false
+no_vnc=false
+rebuild=false
 
 str_param=""
 printf "%s " "Params: "
@@ -20,17 +22,15 @@ do
       r_key=true
       printf "%s " " freeze;"
       ;;
-   --first-symbol)
-      shift
-      first_symbol="$1"
-      str_param+="--first-symbol $first_symbol "
-      printf "%s " " first symbol='$first_symbol';"
+   --no-vnc)
+      no_vnc=true
+      str_param+="--no-vnc $no_vnc "
+      printf "%s " " --no-vnc='$no_vnc';"
       ;;
-   --second-symbol)
-      shift
-      second_symbol="$1"
-      str_param+="--second-symbol $second_symbol "
-      printf "%s " " second-symbol='$second_symbol';"
+   --rebuild)
+      rebuild=true
+      str_param+="--rebuild $rebuild "
+      printf "%s " " rebuild='$rebuild';"
       ;;
    --id)
       shift
@@ -81,17 +81,23 @@ if [ "$r_key" = true ]; then
     pip freeze
 fi
 
-echo "docker build -t myparts_ge . :"
-docker build -t myparts_ge .
+if $rebuild; then
+  echo "docker build -t myparts_ge . :"
+  docker build -t myparts_ge .
+fi
 
-echo "source ./connect_vnc.sh &:"
-source ./connect_vnc.sh &
+if ! $no_vnc; then
+  echo "source ./connect_vnc.sh &:"
+  source ./connect_vnc.sh >/dev/null 2>&1 &
+fi
 
 echo "docker run --rm -it "
 echo "      -v $(pwd)/app:/root/app"
 echo "      -p 5900:5900 "
 echo "            myparts_ge bash :"
 docker run --rm -it -v $(pwd)/app:/root/app -p 5900:5900 myparts_ge bash
+#docker run --rm -it -v $(pwd)/app:/root/app myparts_ge
+
 
 echo "Changing directory to: $start_dir"
 cd "$start_dir" || err_exit $?
