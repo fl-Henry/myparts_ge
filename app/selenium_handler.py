@@ -35,20 +35,36 @@ class ProxyRotator:
 
 class SeleniumHandler:
 
-    def __init__(self, config_file, logger: Logger = None):
+    def __init__(self, config_name, logger: Logger = None):
         self.browser = None
+        self.config = None
+
+        if config_name is None:
+            self.config_name = 'main.cfg'
+        else:
+            self.config_name = config_name
 
         print("Initializing Browser Instance!")
         if logger is not None:
             self.logger = logger
             self.logger.info("Initializing Browser Instance!")
 
-        if os.path.exists(config_file):
-            self.config = configparser.ConfigParser()
-            self.config.read(config_file)
-        else:
-            print("[Warning]: Config_file doesn't exist")
-            sys.exit(1)
+        # path to selenium_handler.py dir
+        self.base_path = str(__file__)[:len(__file__) - len(os.path.basename(str(__file__))) - 1]
+        self.config_path = f"{self.base_path}/{self.config_name}"
+
+        if not os.path.exists(self.config_path):
+            print("[Warning] SeleniumHandler.__init__: Config_file doesn't exist")
+            print("Could you create the default config file? Y/N: ")
+            answer = input()
+            if answer in ['Y', 'y']:
+                self.create_default_config()
+            else:
+                print("[ERROR] SeleniumHandler.__init__: Config_file doesn't exist")
+                sys.exit(1)
+
+        self.config = configparser.ConfigParser()
+        self.config.read(self.config_path)
 
         # browser_path = config.get('DEFAULT', 'browser_path')
         # if self.logger is not None:
@@ -58,6 +74,11 @@ class SeleniumHandler:
             self.logger.debug("driver_path: %s", driver_path)
 
         self.initialize()
+
+    def create_default_config(self):
+        with open(f"{self.base_path}/{self.config_name}", 'w') as cfg:
+            with open(f"{self.base_path}/default.cfg", 'r') as default_cfg:
+                cfg.write(default_cfg.read())
 
     def initialize(self):
         self.browser = None
@@ -92,17 +113,27 @@ class SeleniumHandler:
         if self.config.get('OPTIONS', 'disable-setuid-sandbox') == 'YES':
             options.add_argument(f'--disable-setuid-sandbox')
             if self.logger is not None:
-                self.logger.debug("--disable-setuid-sandbox")
+                self.logger.debug("--disable-setuid-sandbox mode enabled")
 
         if self.config.get('OPTIONS', 'ignore-certificate-errors') == 'YES':
             options.add_argument(f'--ignore-certificate-errors')
             if self.logger is not None:
-                self.logger.debug("--ignore-certificate-errors")
+                self.logger.debug("--ignore-certificate-errors mode enabled")
 
         browser_executable_path = self.config.get('OPTIONS', 'browser_executable_path')
 
+        scale_factor = 1
+        if self.config.get('OPTIONS', 'force-device') == 'YES':
+            scale_factor = float(self.config.get('OPTIONS', 'force-device-scale-factor'))
+            options.add_argument(f"--force-device-scale-factor={scale_factor}")
+
         # Create new Instance of Browser
         self.browser = uc.Chrome(browser_executable_path=browser_executable_path, options=options)
+
+        width = int(round(1200 / scale_factor))
+        height = int(round(720 / scale_factor))
+        self.browser.set_window_size(width, height)
+
         print("Browser has been initialized!")
         if self.logger is not None:
             self.logger.info("Browser has been initialized!")

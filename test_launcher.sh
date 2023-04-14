@@ -10,8 +10,6 @@ err_exit(){
 
 # Get the option
 r_key=false
-no_vnc=false
-rebuild=false
 
 str_param=""
 printf "%s " "Params: "
@@ -81,23 +79,9 @@ if [ "$r_key" = true ]; then
     pip freeze
 fi
 
-if $rebuild; then
-  echo "docker build -t myparts_ge . :"
-  docker build -t myparts_ge .
-fi
-
-if ! $no_vnc; then
-  echo "source ./connect_vnc.sh &:"
-  source ./connect_vnc.sh >/dev/null 2>&1 &
-fi
-
-echo "docker run --rm -it "
-echo "      -v $(pwd)/app:/root/app"
-echo "      -p 5900:5900 "
-echo "            myparts_ge bash :"
-docker run --rm -it -v $(pwd)/app:/root/app -p 5900:5900 myparts_ge bash
-#docker run --rm -it -v $(pwd)/app:/root/app myparts_ge
-
+printf "\npython app/app.py > \n"
+python app/app.py
+printf "< python app/app.py\n\n"
 
 echo "Changing directory to: $start_dir"
 cd "$start_dir" || err_exit $?
