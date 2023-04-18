@@ -12,11 +12,11 @@ from logging import Logger
 
 class ProxyRotator:
     def __init__(self, proxies):
-        # create iterator, which will cycle through the proxies
+        # Create iterator, which will cycle through the proxies
         self.proxies = itertools.cycle(proxies)
         self.current_proxy = None
         self.good_proxy = {}
-        # counter of request to change proxy
+        # Counter of request to change proxy
         self.request_counter = 0
 
     def change_proxy(self):
@@ -36,6 +36,7 @@ class ProxyRotator:
 class SeleniumHandler:
 
     def __init__(self, config_name, logger: Logger = None):
+        # Uses in self.initialize()
         self.browser = None
         self.config = None
 
@@ -81,7 +82,8 @@ class SeleniumHandler:
                 cfg.write(default_cfg.read())
 
     def initialize(self):
-        self.browser = None
+        # TODO Proxy rotator
+        # Defining options
         options = uc.ChromeOptions()
         if self.config.get('OPTIONS', 'headless') == 'YES':
             options.add_argument("--headless")
@@ -130,6 +132,7 @@ class SeleniumHandler:
         # Create new Instance of Browser
         self.browser = uc.Chrome(browser_executable_path=browser_executable_path, options=options)
 
+        # Scaling
         width = int(round(1200 / scale_factor))
         height = int(round(720 / scale_factor))
         self.browser.set_window_size(width, height)
@@ -143,11 +146,13 @@ class SeleniumHandler:
         if self.logger is not None:
             self.logger.info("Reinitializing Browser Instance!")
 
+        # Closing previous instance
         try:
             self.quit_browser()
         except Exception as _ex:
             print(f"[ERROR] Closing | Exception: {_ex}")
 
+        # Initialize new instance
         time.sleep(2)
         self.initialize()
 
@@ -162,26 +167,30 @@ class SeleniumHandler:
         self.browser.quit()
 
     def exit(self, x):
+        # Quit with closing terminal
         self.quit_browser()
         sys.exit(x)
 
     def login(self):
-        # open login url in browser
+        # Open login url in browser
         self.browser.get(self.config.get('LOGIN', 'url'))
 
+        # Type username
         username = self.browser.find_element(By.ID, 'username')
         username.send_keys(self.config.get('LOGIN', 'username'))
 
+        # Type password
         password = self.browser.find_element(By.ID, 'password')
         password.send_keys(self.config.get('LOGIN', 'password'))
 
+        # Click on Submit button
         log_in_button = self.browser.find_element(By.XPATH, '//*[@type="submit"]')
         log_in_button.click()
 
-        # wait time
+        # Waiting for the login process to complete
         time.sleep(self.config.getint('LOGIN', 'wait_time'))
 
-        # validate success url
+        # Validate success url
         if self.logger is not None:
             self.logger.debug("current_url: %s", self.browser.current_url)
             self.logger.debug("success_url: %s", self.config.get('LOGIN', 'success'))
