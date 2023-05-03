@@ -26,7 +26,6 @@ def script_process(sh: SeleniumHandler, lh: LogHandler):
             while sb.execute_script("return document.readyState;") != "complete":
                 sleep(0.5)
                 print('.', end='')
-
             logs.debug(f"URL is loaded:{url}")
             break
         except WebDriverException as _ex:
@@ -51,7 +50,6 @@ def script_process(sh: SeleniumHandler, lh: LogHandler):
     logs.info(f"Click on Manufacturer")
     print(f"Click on Manufacturer")
     xpath = '//div[text()="Manufacturer"]/parent::*/input'
-
     for counter in range(3):
         try:
             WebDriverWait(sb, poll_frequency=1, timeout=10).until(EC.presence_of_element_located((By.XPATH, xpath)))
@@ -79,12 +77,12 @@ def script_process(sh: SeleniumHandler, lh: LogHandler):
             )
             manufacturer_divs = sb.find_element(By.XPATH, xpath)
 
+            # *.upper for comparison // another one list with actual strings
             for manufacturer in str(manufacturer_divs.text).split('\n'):
                 manufacturers_list.append(manufacturer.strip())
                 manufacturers_list_upper.append(manufacturer.strip().upper())
             sleep(1)
             break
-
         except TimeoutException as _ex:
             print(f"Try: {counter} | Exception: {repr(_ex)}")
             sb.refresh()
@@ -97,7 +95,6 @@ def script_process(sh: SeleniumHandler, lh: LogHandler):
         manufacturer_index = manufacturers_list_upper.index(manufacturer.upper())
         manufacturer = manufacturers_list[manufacturer_index]
         print(f"Your choice is: {manufacturer}")
-
         for counter in range(3):
             try:
                 actions.move_to_element(manufacturer_input).click().perform()
