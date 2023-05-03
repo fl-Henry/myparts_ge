@@ -1,6 +1,6 @@
-#!/usr/bin/zsh
+#!/bin/bash
 
-
+# Exit with waiting for type <enter> before exit
 err_exit(){
   echo '[ERROR]'
   printf "%s " "Press enter to continue"
@@ -10,48 +10,75 @@ err_exit(){
 
 # Get the option
 r_key=false
-
+update_key=false
 str_param=""
+pt="./app/app.py"
+
 printf "%s " "Params: "
 while [ "$#" -gt 0 ]
 do
    case "$1" in
+
+  # STDOUT pip freeze
    -f|--freeze)
       r_key=true
       printf "%s " " freeze;"
       ;;
-   --no-vnc)
-      no_vnc=true
-      str_param+="--no-vnc $no_vnc "
-      printf "%s " " --no-vnc='$no_vnc';"
+
+  # Update key
+   -u|--update)
+      update_key='--update'
+      str_param+="$update_key "
+      printf "%s " " --update;"
       ;;
-   --rebuild)
-      rebuild=true
-      str_param+="--rebuild $rebuild "
-      printf "%s " " rebuild='$rebuild';"
-      ;;
-   --id)
+
+  # python file as entrypoint
+   --pt)
       shift
-      id="$1"
-      str_param+="--id $id "
-      printf "%s " " id=$id;"
+      pt="$1"
+      printf "%s " " python file to start='$pt';"
       ;;
-     --test)
-      test="--test"
-      str_param+="$test "
-      printf "%s " "$test;"
+
+#   --start-date)
+#      shift
+#      start_date="$1"
+#      str_param+="--start-date $start_date "
+#      printf "%s " " start-date='$start_date';"
+#      ;;
+#
+#   --end-date)
+#      shift
+#      end_date="$1"
+#      str_param+="--end-date $end_date "
+#      printf "%s " " end-date='$end_date';"
+#      ;;
+#
+#     --tests)
+#      shift
+#      tests="$1"
+#      str_param+="--tests $tests "
+#      printf "%s " " tests #'$tests';"
+#      ;;
+#
+#     --force-url)
+#      force_url="--force-url"
+#      str_param+="$force_url "
+#      printf "%s " " $force_url';"
+#      ;;
+
+     -h|--help)
+      help="--help"
+      str_param+="$help "
+      printf "%s " " $help';"
       ;;
-     --force-url)
-      force_url="--force-url"
-      str_param+="$force_url "
-      printf "%s " " $force_url';"
-      ;;
+
    -*)
-      echo "Invalid option '$1'. Use -h|--help to see the valid options" >&2
+      echo "Invalid option '$1'. Use -h or --help to see the valid options" >&2
       return 1
       ;;
+
    *)
-      echo "Invalid option '$1'. Use -h|--help to see the valid options" >&2
+      echo "Invalid option '$1'. Use -h or --help to see the valid options" >&2
       return 1
    ;;
    esac
@@ -59,9 +86,11 @@ do
 done
 echo
 
+# STDOUT present working directory
 echo "start_dir: $(pwd)"
 start_dir=$(pwd)
 
+# Changing directory to project root directory
 echo "base_dir: $(dirname "$0")"
 base_dir=$(dirname "$0")
 if [ "$base_dir" != "." ]; then
@@ -70,21 +99,33 @@ if [ "$base_dir" != "." ]; then
   echo "pwd: $(pwd)"
 fi
 
+# Activating virtual environment
 echo "Venv activating:"
 source ./venv/bin/activate || err_exit $?
 echo "Venv activated successful"
 
+# pip freeze if -f or --freeze
 if [ "$r_key" = true ]; then
     echo "pip freeze:"
     pip freeze
 fi
 
-printf "\npython app/app.py > \n"
-python app/app.py
-printf "< python app/app.py\n\n"
+# Start app // entrypoint
+printf "\nStart app\n"
+printf "%s\n" "python $pt $str_param > "
+echo "$str_param" | xargs python "$pt"
+printf "\n%s\n\n" "< python $pt $str_param"
 
+# Starting bot with
+# printf "\n%s\n" "Starting bot with args: $str_param "
+# printf "python ./bot_logic.py > \n"
+# while true ; do echo "$str_param" | xargs python ./bot_logic.py || sleep 5; done
+# printf "< python ./bot_logic.py\n\n"
+
+# Changing directory to initial directory
 echo "Changing directory to: $start_dir"
 cd "$start_dir" || err_exit $?
 echo "pwd: $(pwd)"
 
+# Deactivating virtual environment
 deactivate
