@@ -1,74 +1,53 @@
 
-create_table__orders = """
-    CREATE TABLE IF NOT EXISTS orders (
+# TODO: rewrite as a class
+
+create_table__manufacturers = """
+    CREATE TABLE IF NOT EXISTS manufacturers (
         pk INTEGER PRIMARY KEY,
-        symbol TEXT NOT NULL DEFAULT NULL,
-        orderId INTEGER,
-        price TEXT NOT NULL DEFAULT NULL,
-        origQty TEXT NOT NULL DEFAULT NULL,
-        cost TEXT NOT NULL DEFAULT NULL,
-        side TEXT NOT NULL DEFAULT NULL,
-        status TEXT NOT NULL DEFAULT 'PENDING',
-        type TEXT ,
-        timeInForce TEXT ,
-        workingTime INTEGER
+        man_id INTEGER NOT NULL DEFAULT NULL,
+        man_name TEXT NOT NULL DEFAULT NULL
     );
 """
 
-drop_table__orders = """
-    DROP TABLE orders ;
+drop_table__manufacturers = """
+    DROP TABLE manufacturers ;
 """
 
-columns__orders = [
-            'symbol',
-            'orderId',
-            'price',
-            'origQty',
-            'cost',
-            'side',
-            'status',
-            'type',
-            'timeInForce',
-            'workingTime'
+columns__manufacturers = [
+            'man_id',
+            'man_name'
         ]
 
 
-def str__orders(data):
-    return f"[{data.symbol}] P:{data.price}; Q:{data.origQty}; C:{data.cost}; Si:{data.side}; St:{data.status};"
+def str__manufacturers(data):
+    return f"ID: {data.man_id}; Name:{data.man_name};"
 
 
-create_table__pending_orders = """
-    CREATE TABLE IF NOT EXISTS pending_orders (
+create_table__models = """
+    CREATE TABLE IF NOT EXISTS models (
         pk INTEGER PRIMARY KEY,
-        symbol TEXT NOT NULL DEFAULT NULL,
-        orderId INTEGER,
-        price TEXT NOT NULL DEFAULT NULL,
-        origQty TEXT NOT NULL DEFAULT NULL,
-        cost TEXT NOT NULL DEFAULT NULL,
-        side TEXT NOT NULL DEFAULT NULL,
-        status TEXT NOT NULL DEFAULT 'PENDING',
-        type TEXT ,
-        timeInForce TEXT ,
-        workingTime INTEGER
+        model_id INTEGER NOT NULL DEFAULT NULL,
+        model_name TEXT NOT NULL DEFAULT NULL,
+        man_id INTEGER NOT NULL DEFAULT NULL,
+        FOREIGN KEY (man_id) REFERENCES manufacturers (man_id),
     );
 """
 
-columns__pending_orders = [
-            'symbol',
-            'orderId',
-            'price',
-            'origQty',
-            'cost',
-            'side',
-            'status',
-            'type',
-            'timeInForce',
-            'workingTime'
+columns__models = [
+            'model_id',
+            'model_name',
+            'man_id'
         ]
 
 
-def str__pending_orders(data):
-    return f"[{data.symbol}] P:{data.price}; Q:{data.origQty}; C:{data.cost}; Si:{data.side}; St:{data.status};"
+drop_table__models = """
+    DROP TABLE models ;
+"""
+
+
+def str__models(data):
+    # return f"[{data.symbol}] P:{data.price}; Q:{data.origQty}; C:{data.cost}; Si:{data.side}; St:{data.status};"
+    return "str__models > Task failed successfully > 404"
 
 
 create_table__orders_pair = """
@@ -187,8 +166,8 @@ def str__filters(data):
 
 
 create_all_tables = [
-    create_table__orders,
-    create_table__pending_orders,
+    create_table__manufacturers,
+    create_table__models,
     create_table__orders_pair,
     create_table__current_state,
     create_table__filters,
