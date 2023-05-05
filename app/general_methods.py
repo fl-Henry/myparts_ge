@@ -24,8 +24,8 @@ class DaNHandler:
             "temp": temp_dir,
             "for_tests": for_tests_dir,
             "data": f"{base_dir}data/",
-            "sqlite": f"{base_dir}data/sqlite_dbs/",
             "jsons": f"{base_dir}data/jsons/",
+            "csvs": f"{base_dir}data/csvs/",
         }
 
         self.dirs_to_remove = {
