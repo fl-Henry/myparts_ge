@@ -113,7 +113,8 @@ fi
 # Start app // entrypoint
 printf "\nStart app\n"
 printf "%s\n" "python $pt $str_param > "
-echo "$str_param" | xargs python "$pt"
+python ./app/app.py
+# echo "$pt $str_param" | xargs python
 printf "\n%s\n\n" "< python $pt $str_param"
 
 # Starting bot with

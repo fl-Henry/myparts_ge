@@ -1,4 +1,5 @@
 import os
+import csv
 import sys
 import json
 import time
@@ -20,6 +21,7 @@ from print_tags import Tags
 # Parsing the arguments
 args = gm.ArgParser()
 
+
 # Directories and names of files class
 dan = gm.DaNHandler()
 
@@ -27,6 +29,15 @@ dan = gm.DaNHandler()
 # # ===== General Methods ======================================================================= General Methods =====
 ...
 # # ===== General Methods ======================================================================= General Methods =====
+
+
+def clear_screen():
+    # Check if Operating System is Mac and Linux or Windows
+    if os.name == 'posix':
+        _ = os.system('clear')
+    else:
+        # Else Operating System is Windows (os.name = nt)
+        _ = os.system('cls')
 
 
 def decapsule_children(parent_dict: dict, children_key="children", parent_id_key=None):
@@ -103,6 +114,7 @@ def get_json_data(url, file_path=None, save_to_file=False, method="GET", request
                 print(f"Data saved to {file_path}")
 
     if json_data is None:
+        print(f"\n{Tags.LightYellow}Getting data from {file_path}{Tags.ResetAll}")
         if not os.path.exists(file_path):
             raise FileExistsError(f"File doesn't exist: {file_path}")
         else:
@@ -110,6 +122,37 @@ def get_json_data(url, file_path=None, save_to_file=False, method="GET", request
                 json_data = json.loads(f.read())
 
     return json_data
+
+
+def save_to_csv(to_csv_df, file_path=None):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if file_path is not None:
+        dan.files.update({"main_data": file_path})
+    else:
+        file_path = f"{dan.dirs['csvs']}{timestamp}_orders_data.csv"
+        dan.files.update({f"{timestamp}_orders_data.csv": file_path})
+
+    to_csv_df.to_csv(file_path, sep=';', encoding='utf-8')
+    print(f"\n{Tags.LightYellow}Saved to: {file_path}{Tags.ResetAll}")
+
+
+def df_select_one(df: pd.DataFrame, column, value):
+    return df[df[column] == value].reset_index(drop=True).iloc[0].to_frame().T
+
+
+def df_select_all(df: pd.DataFrame, column, value):
+    return df[df[column] == value].reset_index(drop=True)
+
+
+def compact_df(main_df, columns_num=4):
+    df_len = len(main_df) // columns_num
+    df_1 = main_df.iloc[:df_len]
+    len_counter = 1
+    while df_len * len_counter < len(main_df):
+        df_2 = main_df.iloc[len_counter * df_len:(len_counter + 1) * df_len].reset_index(drop=True)
+        df_1 = pd.concat([df_1, df_2], axis=1).reset_index(drop=True)
+        len_counter += 1
+    return df_1
 
 
 # # ===== Base logic Methods ================================================================= Base logic Methods =====
@@ -120,7 +163,8 @@ def get_json_data(url, file_path=None, save_to_file=False, method="GET", request
 def get_main_data(save_to_file=False, file_path=None):
 
     # URL with json main data -> manufacturer / model / part categories
-    url = "https://www.myparts.ge/build/assets/appdata/en.json"
+    # url = "https://www.myparts.ge/build/assets/appdata/en.json"
+    url = "https://www.myparts.ge/build/assets/appdata/ka.json"
 
     # File path for main_data_json
     if file_path is not None:
@@ -179,7 +223,8 @@ def get_orders_data(request_data):
     # ["product_id"] <int>
     # ["cat_id"] <int>
     # ["currency_id"] <int> -> 3 is GEL
-    # ["price"] <str> GEL -> float
+    # ["price"] <str> -> float  # In a pair with currency_id
+    # ["price_value"] <str> -> float  # GEL
     # ["views"] <int>
     # ["cond_type_id"] <int>
     # ["order_date"] <datetime>?
@@ -187,61 +232,23 @@ def get_orders_data(request_data):
     for product in raw_products_list:
         product_dict = {
             "product_id": product["product_id"],
+            "title": product["lang_data"]["title"],
             "cond_type_id": product["cond_type_id"],
             "man_id": request_data["man_id"],
             "model_id": request_data["model_id"],
             "year": request_data["year_from"],
+            "year_from": product["product_models"][0]["year_from"],
+            "year_to": product["product_models"][0]["year_to"],
             "cat_id": product["cat_id"],
-            "price": product["price"],
-            "currency_id": product["currency_id"],
+            "price_value": float(product["price_value"]),
+            # "price": float(product["price"]),
+            # "currency_id": product["currency_id"],
             "views": product["views"],
             "order_date": product["order_date"],
         }
         products_list.append(product_dict)
 
     return products_list
-
-#
-# def get_product_detail_data(product_id, save_to_file=False, file_path=None):
-#
-#     # URL with json containing product detail data
-#     url = f"https://api2.myparts.ge/api/en/products/detail/{product_id}"
-#
-#     # File path for *_detail_data_json
-#     if file_path is not None:
-#         dan.files.update({f"product_{product_id}": file_path})
-#     else:
-#         dan.files.update({f"product_{product_id}": f"{dan.dirs['jsons']}{product_id}_detail_data.json"})
-#
-#     json_data = get_json_data(url, file_path=dan.files[f"product_{product_id}"], save_to_file=save_to_file)
-#     return json_data
-
-#
-# def get_products_data(orders_data_json):
-#     # https://api2.myparts.ge/api/en/products/detail/11923084
-#     # ["lang_data"]["title"] <str>
-#     # ["cat_id"] <int>
-#     # ["currency_id"] <int> -> 3 is GEL
-#     # ["price"] <str> GEL -> float
-#     # ["views"] <int>
-#     # ["cond_type_id"] <int>
-#     # ["order_date"] <datetime>?
-#     products_data_json = []
-#     product_id_list = [x["product_id"] for x in orders_data_json]
-#     for product_id in product_id_list:
-#         product_detail_data = get_product_detail_data(product_id, save_to_file=True)
-#         product_details_dict = {
-#             "product_id": product_detail_data["data"]["product_id"],
-#             "title": product_detail_data["data"]["lang_data"]["title"],
-#             "cond_type_id": product_detail_data["data"]["cond_type_id"],
-#             "cat_id": product_detail_data["data"]["cat_id"],
-#             "price": product_detail_data["data"]["price"],
-#             "currency_id": product_detail_data["data"]["currency_id"],
-#             "views": product_detail_data["data"]["views"],
-#             "order_date": product_detail_data["data"]["order_date"],
-#         }
-#         products_data_json.append(product_details_dict)
-#     return products_data_json
 
 
 def get_manufacturers(main_data_json):
@@ -288,12 +295,33 @@ def get_models(main_data_json):
     return models_json
 
 
+def get_currencies(main_data_json):
+    """
+        currencies_json = {
+            "currency_id": int,            \n
+            "currency_name": str,          \n
+        }
+    :param main_data_json:
+    :return:
+    """
+    currencies_json = []
+    for raw_currency in main_data_json["Currencies"]:
+        currency_dict = {
+            "currency_id": int(raw_currency["currencyID"]),
+            "currency_name": str(raw_currency["title"]),
+        }
+        currencies_json.append(currency_dict)
+
+    return currencies_json
+
+
 def get_categories(main_data_json):
     """
         return = [
-            id: {
-                parent_id,             \n
-                text,                  \n
+            {
+                id: int,                    \n
+                parent_id: int,             \n
+                text: str,                  \n
             },{...}
         ]
 
@@ -310,7 +338,7 @@ def get_categories(main_data_json):
 
         # Checking infinity loop
         if infinity_loop_counter > 10000:
-            raise Exception("[ERROR] Getting categories > infinity loop")
+            raise Exception("[ERROR] get_categories > infinity loop")
         else:
             infinity_loop_counter += 1
 
@@ -339,6 +367,65 @@ def get_categories(main_data_json):
     return json_to_return
 
 
+def get_parent_categories(categories_df, sub_category_id: int):
+
+    # Creating start list with categories DataFrames (from child to parent)
+    last_category = categories_df[categories_df["id"] == sub_category_id].reset_index(drop=True)
+    categories_df_list = [last_category]
+
+    # Finding all parent categories
+    infinity_loop_counter = 0
+    while categories_df_list[-1]["parent_id"][0] != 0:
+
+        # Checking infinity loop
+        if infinity_loop_counter > 10000:
+            raise Exception("[ERROR] get_parent_categories > infinity loop")
+        else:
+            infinity_loop_counter += 1
+
+        # parent_id for current sub_category
+        parent_id = categories_df_list[-1]["parent_id"][0]
+
+        # Finding parent category and append to list
+        parent_category_df = categories_df[categories_df["id"] == parent_id].reset_index(drop=True)
+        categories_df_list.append(parent_category_df)
+
+    # Removing last category ("Auto parts")
+    categories_df_list.pop()
+
+    # Cleaning list of categories
+    categories_df_list = [x["text"][0] for x in reversed(categories_df_list)]
+
+    # Creating DataFrame
+    categories_list_df = pd.DataFrame(
+        [[sub_category_id, categories_df_list[0], [666], categories_df_list[-1]]],
+        columns=["cat_id", "main_category", "sub_categories", "product_name"]
+    )
+    categories_list_df.at[0, "sub_categories"] = categories_df_list[1:-1]
+
+    return categories_list_df
+
+
+def replace_df_column(main_df, column_data_df, joint_column_name, columns_to_join: list[str] = None):
+
+    # Drop every column that not in not_drop_list
+    if columns_to_join is not None:
+        not_drop_list = [joint_column_name, *columns_to_join]
+        for column_name in column_data_df.columns:
+            if column_name not in not_drop_list:
+                column_data_df = column_data_df.drop(columns=column_name)
+
+    # Join DataFrames and drop joint column
+    df_to_return = pd.DataFrame()
+    for index, row in main_df.iterrows():
+        column_data = column_data_df[(column_data_df[joint_column_name]) == int(row[joint_column_name])].reset_index(drop=True)
+        row = row.to_frame().T.reset_index(drop=True)
+        row = pd.concat([row, column_data], axis=1)
+        df_to_return = pd.concat([df_to_return, row], ignore_index=True)
+    df_to_return = df_to_return.drop(columns=[joint_column_name, joint_column_name])
+    return df_to_return
+
+
 def replace_manufacturer(orders_data_df, manufacturers_df):
     df_to_return = pd.DataFrame()
     for index, row in orders_data_df.iterrows():
@@ -348,6 +435,63 @@ def replace_manufacturer(orders_data_df, manufacturers_df):
         df_to_return = pd.concat([df_to_return, row], ignore_index=True)
     df_to_return = df_to_return.drop(columns=["man_id", "man_id"])
     return df_to_return
+
+
+def choosing_request_data(manufacturers_df, models_df, years_list, categories_df):
+    clear_screen()
+
+    # Selecting manufacturer
+    pd.set_option("display.max_rows", None)
+    print(f"{Tags.LightYellow}{Tags.Reverse}Manufacturers table{Tags.ResetAll}")
+    print(compact_df(manufacturers_df, columns_num=4).fillna(0).astype({"man_id": "int32"}).to_string(index=False))
+    print("Select manufacturer's ID (Ex: 41): ", end="")
+    man_id = int(input())
+    man_name = df_select_one(manufacturers_df, "man_id", man_id)["man_name"][0]
+    clear_screen()
+
+    # Selecting model
+    models_df = df_select_all(models_df, "man_id", man_id)
+    compact_models_df = compact_df(models_df, columns_num=4).fillna(0).astype({"model_id": "int32"})
+    compact_models_df = compact_models_df.drop(columns=["man_id"]).to_string(index=False)
+    print(f"{Tags.LightYellow}{Tags.Reverse}Models table{Tags.ResetAll}")
+    print(compact_models_df)
+    print(f"Manufacturer: {man_name}; Select models's ID (Ex: 1139): ", end="")
+    model_id = int(input())
+    model_name = df_select_one(models_df, "model_id", model_id)["model_name"][0]
+    clear_screen()
+
+    # Selecting year
+    print(f"\nAvailable years: {years_list[0]} - {years_list[-1]}")
+    print(f"Manufacturer: {man_name}; Model: {model_name}; Select year (Ex: 1998): ", end="")
+    year = int(input())
+    clear_screen()
+
+    # Selecting category
+    cat_id = 19
+    current_categories_df = df_select_all(categories_df, "parent_id", cat_id)
+    categories_list = []
+    while len(current_categories_df) != 0:
+        print(f"{Tags.LightYellow}{Tags.Reverse}Categories table{Tags.ResetAll}")
+        print(current_categories_df.to_string(index=False, columns=["id", "text"]))
+        print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
+        print("Categories:", " > ".join(categories_list), "Select category's ID (Ex: 457): ", end="")
+        cat_id = int(input())
+        cat_name = df_select_one(categories_df, "id", cat_id)["text"][0]
+        categories_list.append(cat_name)
+        current_categories_df = df_select_all(categories_df, "parent_id", cat_id)
+        clear_screen()
+
+    print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
+    print("\nCategories:", " > ".join(categories_list))
+
+    # Setting request_data dict
+    request_data = {
+        "man_id": man_id,
+        "model_id": model_id,
+        "year_from": year,
+        "cat_id": cat_id,
+    }
+    return request_data
 
 
 # # ===== Start app =================================================================================== Start app =====
@@ -360,6 +504,8 @@ def start_app():
     # STDOUT input parameters
     print(args)
     print(dan, end="\n\n")
+
+    args.update_key = True
 
     # Getting or updating main_data_json
     main_data_json = get_main_data(save_to_file=True)
@@ -382,6 +528,13 @@ def start_app():
     today_year = datetime.date.today().year
     years_list = range(today_year - 60, today_year + 1)
 
+    # Getting Currencies
+    currencies_json = get_currencies(main_data_json)
+    currencies_df = pd.DataFrame(
+        currencies_json,
+        columns=["currency_id", "currency_name"]
+    )
+
     # Getting categories
     categories_json = get_categories(main_data_json)
     categories_df = pd.DataFrame(
@@ -403,29 +556,48 @@ def start_app():
         columns=["cond_type_id", "cond_type_name"]
     )
 
+    request_data = choosing_request_data(manufacturers_df, models_df, years_list, categories_df)
+
     # Getting orders_data
-    request_data = {
-        "man_id": "41",
-        "model_id": "1089",
-        "year_from": "2018",
-        "cat_id": "1261",
-    }
+    # request_data = {
+    #     "man_id": "41",
+    #     "model_id": "1089",
+    #     "year_from": "2018",
+    #     "cat_id": "1261",
+    # }
     orders_data_json = get_orders_data(request_data)
     orders_data_df = pd.DataFrame(
         orders_data_json,
     )
 
-    # # Getting products' products_data
-    # products_data_json = get_products_data(orders_data_json)
-    # products_data_df = pd.DataFrame(
-    #     products_data_json,
-    # )
-    # pd.set_option("display.max_rows", None)
-    # print(products_data_df)
-    ...
-    # Creating table to save as CSV
-    df = replace_manufacturer(orders_data_df, manufacturers_df)
-    print(df)
+    if len(orders_data_df) > 0:
+        # Creating table to save as CSV // replace Manufacturer
+        to_csv_df = replace_df_column(orders_data_df, manufacturers_df, "man_id")
+
+        # # Replace Currency
+        # to_csv_df = replace_df_column(to_csv_df, currencies_df, "currency_id")
+
+        # Replace Condition type
+        to_csv_df = replace_df_column(to_csv_df, condition_types_df, "cond_type_id")
+
+        # Replace Model
+        to_csv_df = replace_df_column(to_csv_df, models_df, "model_id", columns_to_join=["model_name"])
+
+        # Get parent categories by children
+        categories_list_df = get_parent_categories(categories_df, int(request_data["cat_id"]))
+
+        # Replace Categories
+        to_csv_df = replace_df_column(to_csv_df, categories_list_df, "cat_id")
+
+        columns_order = ["product_id", "man_name", "model_name", "year", "main_category", "sub_categories", "product_name",
+                         "title", "year_from", "year_to", "cond_type_name", "price_value", "views", "order_date"]
+
+        to_csv_df = to_csv_df[columns_order]
+        # print(to_csv_df)
+        save_to_csv(to_csv_df)
+        print(f"The details of the orders have been {Tags.LightYellow}{Tags.Reverse}successfully saved{Tags.ResetAll}")
+    else:
+        print(f"{Tags.LightYellow}{Tags.Reverse}There are no any orders!!!{Tags.ResetAll}")
 
 
 def anchor_for_navigate():
