@@ -22,9 +22,9 @@ class DaNHandler:
         self.dirs = {
             "base": base_dir,
             "temp": temp_dir,
+            "jsons": f"{temp_dir}jsons/",
             "for_tests": for_tests_dir,
             "data": f"{base_dir}data/",
-            "jsons": f"{base_dir}data/jsons/",
             "csvs": f"{base_dir}data/csvs/",
         }
 

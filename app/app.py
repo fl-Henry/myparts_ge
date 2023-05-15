@@ -133,7 +133,7 @@ def save_to_csv(to_csv_df, file_path=None):
         dan.files.update({f"{timestamp}_orders_data.csv": file_path})
 
     to_csv_df.to_csv(file_path, sep=';', encoding='utf-8')
-    print(f"\n{Tags.LightYellow}Saved to: {file_path}{Tags.ResetAll}")
+    print(f"\n{Tags.LightYellow}Saved to: ./data/csvs/{gm.url_to_name(file_path)}{Tags.ResetAll}")
 
 
 def df_select_one(df: pd.DataFrame, column, value):
@@ -236,7 +236,6 @@ def get_orders_data(request_data):
             "cond_type_id": product["cond_type_id"],
             "man_id": request_data["man_id"],
             "model_id": request_data["model_id"],
-            "year": request_data["year_from"],
             "year_from": product["product_models"][0]["year_from"],
             "year_to": product["product_models"][0]["year_to"],
             "cat_id": product["cat_id"],
@@ -438,59 +437,121 @@ def replace_manufacturer(orders_data_df, manufacturers_df):
 
 
 def choosing_request_data(manufacturers_df, models_df, years_list, categories_df):
-    clear_screen()
 
     # Selecting manufacturer
+    clear_screen()
     pd.set_option("display.max_rows", None)
     print(f"{Tags.LightYellow}{Tags.Reverse}Manufacturers table{Tags.ResetAll}")
     print(compact_df(manufacturers_df, columns_num=4).fillna(0).astype({"man_id": "int32"}).to_string(index=False))
-    print("Select manufacturer's ID (Ex: 41): ", end="")
-    man_id = int(input())
-    man_name = df_select_one(manufacturers_df, "man_id", man_id)["man_name"][0]
-    clear_screen()
+
+    man_name = ""
+    while len(man_name) == 0:
+        print("Select manufacturer's ID (Ex: 41 or exit): ", end="")
+        input_value = input()
+        if "exit" in input_value.lower():
+            print("EXIT")
+            sys.exit()
+        try:
+            man_id = int(input_value)
+            man_name = df_select_one(manufacturers_df, "man_id", man_id)["man_name"][0]
+            break
+        except:
+            print("Wrong input")
 
     # Selecting model
+    clear_screen()
     models_df = df_select_all(models_df, "man_id", man_id)
     compact_models_df = compact_df(models_df, columns_num=4).fillna(0).astype({"model_id": "int32"})
     compact_models_df = compact_models_df.drop(columns=["man_id"]).to_string(index=False)
     print(f"{Tags.LightYellow}{Tags.Reverse}Models table{Tags.ResetAll}")
     print(compact_models_df)
-    print(f"Manufacturer: {man_name}; Select models's ID (Ex: 1139): ", end="")
-    model_id = int(input())
-    model_name = df_select_one(models_df, "model_id", model_id)["model_name"][0]
-    clear_screen()
+
+    model_name = ""
+    while len(model_name) == 0:
+
+        print(f"Manufacturer: {man_name}; Select models's ID (Ex: 1139 or exit): ", end="")
+        input_value = input()
+        if "exit" in input_value.lower():
+            print("EXIT")
+            sys.exit()
+        try:
+            model_id = int(input_value)
+            model_name = df_select_one(models_df, "model_id", model_id)["model_name"][0]
+            break
+        except:
+            print("Wrong input")
 
     # Selecting year
-    print(f"\nAvailable years: {years_list[0]} - {years_list[-1]}")
-    print(f"Manufacturer: {man_name}; Model: {model_name}; Select year (Ex: 1998): ", end="")
-    year = int(input())
     clear_screen()
+    print(f"\nAvailable years: {years_list[0]} - {years_list[-1]}")
+
+    year = ""
+    while not len(year) > 0:
+        print(f"Manufacturer: {man_name}; Model: {model_name}; Select year (Ex: 1998 or all or exit): ", end="")
+        input_value = input()
+        if "exit" in input_value.lower():
+            print("EXIT")
+            sys.exit()
+        elif "all" in input_value.lower():
+            print("ALL years")
+            year = "ALL"
+            continue
+        else:
+            year = int(input_value)
+        try:
+            if years_list[0] <= year <= years_list[-1]:
+                break
+            else:
+                raise Exception
+        except:
+            print("Wrong input")
 
     # Selecting category
+    clear_screen()
     cat_id = 19
     current_categories_df = df_select_all(categories_df, "parent_id", cat_id)
     categories_list = []
     while len(current_categories_df) != 0:
         print(f"{Tags.LightYellow}{Tags.Reverse}Categories table{Tags.ResetAll}")
         print(current_categories_df.to_string(index=False, columns=["id", "text"]))
-        print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
-        print("Categories:", " > ".join(categories_list), "Select category's ID (Ex: 457): ", end="")
-        cat_id = int(input())
-        cat_name = df_select_one(categories_df, "id", cat_id)["text"][0]
+
+        cat_name = ""
+        while len(cat_name) == 0:
+
+            print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
+            print("Categories:", " > ".join(categories_list), "Select category's ID (Ex: 457 or exit): ", end="")
+            input_value = input()
+            if "exit" in input_value.lower():
+                print("EXIT")
+                sys.exit()
+            try:
+                cat_id = int(input_value)
+                cat_name = df_select_one(categories_df, "id", cat_id)["text"][0]
+                break
+            except:
+                print("Wrong input")
+
         categories_list.append(cat_name)
         current_categories_df = df_select_all(categories_df, "parent_id", cat_id)
         clear_screen()
 
     print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
-    print("\nCategories:", " > ".join(categories_list))
+    print("Categories:", " > ".join(categories_list))
 
     # Setting request_data dict
-    request_data = {
-        "man_id": man_id,
-        "model_id": model_id,
-        "year_from": year,
-        "cat_id": cat_id,
-    }
+    if year == "ALL":
+        request_data = {
+            "man_id": man_id,
+            "model_id": model_id,
+            "cat_id": cat_id,
+        }
+    else:
+        request_data = {
+            "man_id": man_id,
+            "model_id": model_id,
+            "year_from": year,
+            "cat_id": cat_id,
+        }
     return request_data
 
 
@@ -589,7 +650,7 @@ def start_app():
         # Replace Categories
         to_csv_df = replace_df_column(to_csv_df, categories_list_df, "cat_id")
 
-        columns_order = ["product_id", "man_name", "model_name", "year", "main_category", "sub_categories", "product_name",
+        columns_order = ["product_id", "man_name", "model_name", "main_category", "sub_categories", "product_name",
                          "title", "year_from", "year_to", "cond_type_name", "price_value", "views", "order_date"]
 
         to_csv_df = to_csv_df[columns_order]
@@ -597,7 +658,9 @@ def start_app():
         save_to_csv(to_csv_df)
         print(f"The details of the orders have been {Tags.LightYellow}{Tags.Reverse}successfully saved{Tags.ResetAll}")
     else:
-        print(f"{Tags.LightYellow}{Tags.Reverse}There are no any orders!!!{Tags.ResetAll}")
+        print(f"{Tags.LightYellow}{Tags.Reverse}There are not any orders!!!{Tags.ResetAll}")
+
+    dan.remove_dirs()
 
 
 def anchor_for_navigate():
