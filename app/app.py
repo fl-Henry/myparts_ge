@@ -99,7 +99,14 @@ def get_json_data(url, file_path=None, save_to_file=False, method="GET", request
     # API request to get json
     json_data = None
     if update_key:
-        print(f"\n{Tags.LightYellow}Getting data from {url}{Tags.ResetAll}")
+        if request_data is not None:
+            if request_data.get("page") is not None:
+                print(f"\n{Tags.LightYellow}Getting data from {url} page={request_data.get('page')}{Tags.ResetAll}")
+            else:
+                print(f"\n{Tags.LightYellow}Getting data from {url}{Tags.ResetAll}")
+        else:
+            print(f"\n{Tags.LightYellow}Getting data from {url}{Tags.ResetAll}")
+
         if method == "GET":
             response = requests.get(url)
         elif method == "POST":
@@ -216,6 +223,7 @@ def get_orders_data(request_data):
             update_key=True
         )
         raw_products_list.extend(json_data["data"]["products"])
+        break
 
     # Parsing raw_products_list
     ...
@@ -231,19 +239,19 @@ def get_orders_data(request_data):
     products_list = []
     for product in raw_products_list:
         product_dict = {
-            "product_id": product["product_id"],
-            "title": product["lang_data"]["title"],
-            "cond_type_id": product["cond_type_id"],
-            "man_id": request_data["man_id"],
-            "model_id": request_data["model_id"],
-            "year_from": product["product_models"][0]["year_from"],
-            "year_to": product["product_models"][0]["year_to"],
-            "cat_id": product["cat_id"],
-            "price_value": float(product["price_value"]),
+            "product_id": product.get("product_id"),
+            "title": product.get("lang_data").get("title"),
+            "cond_type_id": product.get("cond_type_id"),
+            "man_id": request_data.get("man_id"),
+            "model_id": request_data.get("model_id"),
+            "year_from": product.get("product_models")[0]["year_from"],
+            "year_to": product.get("product_models")[0]["year_to"],
+            "cat_id": product.get("cat_id"),
+            "price_value": float(product.get("price_value")),
             # "price": float(product["price"]),
             # "currency_id": product["currency_id"],
-            "views": product["views"],
-            "order_date": product["order_date"],
+            "views": product.get("views"),
+            "order_date": product.get("order_date"),
         }
         products_list.append(product_dict)
 
@@ -263,8 +271,8 @@ def get_manufacturers(main_data_json):
     for raw_man in main_data_json["Mans"]:
         if raw_man["is_car"] is True:
             man_dict = {
-                "man_id": int(raw_man["man_id"]),
-                "man_name": str(raw_man["man_name"]),
+                "man_id": int(raw_man.get("man_id")),
+                "man_name": str(raw_man.get("man_name")),
             }
             manufacturers_json.append(man_dict)
 
@@ -285,9 +293,9 @@ def get_models(main_data_json):
     models_json = []
     for item in main_data_json["Models"]:
         model_dict = {
-            "model_id": int(item["model_id"]),
-            "man_id": int(item["man_id"]),
-            "model_name": item["model_name"],
+            "model_id": int(item.get("model_id")),
+            "man_id": int(item.get("man_id")),
+            "model_name": item.get("model_name"),
         }
         models_json.append(model_dict)
 
@@ -306,8 +314,8 @@ def get_currencies(main_data_json):
     currencies_json = []
     for raw_currency in main_data_json["Currencies"]:
         currency_dict = {
-            "currency_id": int(raw_currency["currencyID"]),
-            "currency_name": str(raw_currency["title"]),
+            "currency_id": int(raw_currency.get("currencyID")),
+            "currency_name": str(raw_currency.get("title")),
         }
         currencies_json.append(currency_dict)
 
@@ -356,9 +364,9 @@ def get_categories(main_data_json):
     json_to_return = []
     for category in parent_list:
         category_dict = {
-            "id": int(category["id"]),
-            "parent_id": int(category["parent_id"]),
-            "text": str(category["text"]),
+            "id": int(category.get("id")),
+            "parent_id": int(category.get("parent_id")),
+            "text": str(category.get("text")),
 
         }
         json_to_return.append(category_dict)
@@ -417,11 +425,23 @@ def replace_df_column(main_df, column_data_df, joint_column_name, columns_to_joi
     # Join DataFrames and drop joint column
     df_to_return = pd.DataFrame()
     for index, row in main_df.iterrows():
-        column_data = column_data_df[(column_data_df[joint_column_name]) == int(row[joint_column_name])].reset_index(drop=True)
-        row = row.to_frame().T.reset_index(drop=True)
-        row = pd.concat([row, column_data], axis=1)
-        df_to_return = pd.concat([df_to_return, row], ignore_index=True)
-    df_to_return = df_to_return.drop(columns=[joint_column_name, joint_column_name])
+        try:
+            column_data = column_data_df[(column_data_df[joint_column_name]) == int(row[joint_column_name])].reset_index(drop=True)
+            row = row.to_frame().T.reset_index(drop=True)
+            row = pd.concat([row, column_data], axis=1)
+            df_to_return = pd.concat([df_to_return, row], ignore_index=True)
+        except TypeError as _ex:
+            print(f"{_ex} > {row}")
+            continue
+    try:
+        df_to_return = df_to_return.drop(columns=[joint_column_name])
+    except KeyError as _ex:
+        print(f"\n{_ex} > ")
+        print("joint_column_name:", joint_column_name)
+        print("df_to_return:")
+        print(df_to_return)
+        raise _ex
+
     return df_to_return
 
 
@@ -446,11 +466,15 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
 
     man_name = ""
     while len(man_name) == 0:
-        print("Select manufacturer's ID (Ex: 41 or exit): ", end="")
+        print("Select manufacturer's ID (Ex: 41 or all or exit): ", end="")
         input_value = input()
         if "exit" in input_value.lower():
             print("EXIT")
             sys.exit()
+        elif "all" in input_value.lower():
+            print("ALL manufacturers")
+            man_name = "ALL"
+            continue
         try:
             man_id = int(input_value)
             man_name = df_select_one(manufacturers_df, "man_id", man_id)["man_name"][0]
@@ -459,27 +483,34 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
             print("Wrong input")
 
     # Selecting model
-    clear_screen()
-    models_df = df_select_all(models_df, "man_id", man_id)
-    compact_models_df = compact_df(models_df, columns_num=4).fillna(0).astype({"model_id": "int32"})
-    compact_models_df = compact_models_df.drop(columns=["man_id"]).to_string(index=False)
-    print(f"{Tags.LightYellow}{Tags.Reverse}Models table{Tags.ResetAll}")
-    print(compact_models_df)
+    if not man_name == "ALL":
+        clear_screen()
+        models_df = df_select_all(models_df, "man_id", man_id)
+        compact_models_df = compact_df(models_df, columns_num=4).fillna(0).astype({"model_id": "int32"})
+        compact_models_df = compact_models_df.drop(columns=["man_id"]).to_string(index=False)
+        print(f"{Tags.LightYellow}{Tags.Reverse}Models table{Tags.ResetAll}")
+        print(compact_models_df)
 
-    model_name = ""
-    while len(model_name) == 0:
+        model_name = ""
+        while len(model_name) == 0:
 
-        print(f"Manufacturer: {man_name}; Select models's ID (Ex: 1139 or exit): ", end="")
-        input_value = input()
-        if "exit" in input_value.lower():
-            print("EXIT")
-            sys.exit()
-        try:
-            model_id = int(input_value)
-            model_name = df_select_one(models_df, "model_id", model_id)["model_name"][0]
-            break
-        except:
-            print("Wrong input")
+            print(f"Manufacturer: {man_name}; Select model's ID (Ex: 1139 or all or exit): ", end="")
+            input_value = input()
+            if "exit" in input_value.lower():
+                print("EXIT")
+                sys.exit()
+            elif "all" in input_value.lower():
+                print("ALL models")
+                model_name = "ALL"
+                continue
+            try:
+                model_id = int(input_value)
+                model_name = df_select_one(models_df, "model_id", model_id)["model_name"][0]
+                break
+            except:
+                print("Wrong input")
+    else:
+        model_name = "ALL"
 
     # Selecting year
     clear_screen()
@@ -496,9 +527,8 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
             print("ALL years")
             year = "ALL"
             continue
-        else:
-            year = int(input_value)
         try:
+            year = int(input_value)
             if years_list[0] <= year <= years_list[-1]:
                 break
             else:
@@ -511,7 +541,8 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
     cat_id = 19
     current_categories_df = df_select_all(categories_df, "parent_id", cat_id)
     categories_list = []
-    while len(current_categories_df) != 0:
+    cat_name = ""
+    while (len(current_categories_df) != 0) and (cat_name != "ALL"):
         print(f"{Tags.LightYellow}{Tags.Reverse}Categories table{Tags.ResetAll}")
         print(current_categories_df.to_string(index=False, columns=["id", "text"]))
 
@@ -519,11 +550,15 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
         while len(cat_name) == 0:
 
             print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
-            print("Categories:", " > ".join(categories_list), "Select category's ID (Ex: 457 or exit): ", end="")
+            print("Categories:", " > ".join(categories_list), "Select category's ID (Ex: 457 or all or exit): ", end="")
             input_value = input()
             if "exit" in input_value.lower():
                 print("EXIT")
                 sys.exit()
+            elif "all" in input_value.lower():
+                print("ALL categories")
+                cat_name = "ALL"
+                continue
             try:
                 cat_id = int(input_value)
                 cat_name = df_select_one(categories_df, "id", cat_id)["text"][0]
@@ -536,22 +571,22 @@ def choosing_request_data(manufacturers_df, models_df, years_list, categories_df
         clear_screen()
 
     print(f"Manufacturer: {man_name}; Model: {model_name}; Year: {year}")
-    print("Categories:", " > ".join(categories_list))
+    if cat_name == "ALL":
+        print("Categories: ALL")
+    else:
+        print("Categories:", " > ".join(categories_list))
 
     # Setting request_data dict
-    if year == "ALL":
-        request_data = {
-            "man_id": man_id,
-            "model_id": model_id,
-            "cat_id": cat_id,
-        }
-    else:
-        request_data = {
-            "man_id": man_id,
-            "model_id": model_id,
-            "year_from": year,
-            "cat_id": cat_id,
-        }
+    request_data = {}
+    if year != "ALL":
+        request_data.update({"year_from": year})
+    if man_name != "ALL":
+        request_data.update({"man_id": man_id})
+    if model_name != "ALL":
+        request_data.update({"model_id": model_id})
+    if cat_name != "ALL":
+        request_data.update({"cat_id": cat_id})
+
     return request_data
 
 
@@ -631,9 +666,16 @@ def start_app():
         orders_data_json,
     )
 
+    columns_order = ["product_id", "man_name", "model_name", "main_category", "sub_categories", "product_name",
+                     "title", "year_from", "year_to", "cond_type_name", "price_value", "views", "order_date"]
+
     if len(orders_data_df) > 0:
         # Creating table to save as CSV // replace Manufacturer
-        to_csv_df = replace_df_column(orders_data_df, manufacturers_df, "man_id")
+        if request_data.get("man_id") is not None:
+            to_csv_df = replace_df_column(orders_data_df, manufacturers_df, "man_id")
+        else:
+            to_csv_df = orders_data_df
+            columns_order.remove("man_name")
 
         # # Replace Currency
         # to_csv_df = replace_df_column(to_csv_df, currencies_df, "currency_id")
@@ -642,16 +684,19 @@ def start_app():
         to_csv_df = replace_df_column(to_csv_df, condition_types_df, "cond_type_id")
 
         # Replace Model
-        to_csv_df = replace_df_column(to_csv_df, models_df, "model_id", columns_to_join=["model_name"])
+        if request_data.get("model_id") is not None:
+            to_csv_df = replace_df_column(to_csv_df, models_df, "model_id", columns_to_join=["model_name"])
+        else:
+            columns_order.remove("model_name")
 
-        # Get parent categories by children
-        categories_list_df = get_parent_categories(categories_df, int(request_data["cat_id"]))
+        # Get all parent categories by children
+
+        categories_list_df = get_parent_categories(categories_df, int(to_csv_df.iloc[0]["cat_id"]))
+        print(categories_list_df)
+        sys.exit()
 
         # Replace Categories
         to_csv_df = replace_df_column(to_csv_df, categories_list_df, "cat_id")
-
-        columns_order = ["product_id", "man_name", "model_name", "main_category", "sub_categories", "product_name",
-                         "title", "year_from", "year_to", "cond_type_name", "price_value", "views", "order_date"]
 
         to_csv_df = to_csv_df[columns_order]
         # print(to_csv_df)
