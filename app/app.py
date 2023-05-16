@@ -101,7 +101,7 @@ def get_json_data(url, file_path=None, save_to_file=False, method="GET", request
     if update_key:
         if request_data is not None:
             if request_data.get("page") is not None:
-                print(f"\n{Tags.LightYellow}Getting data from {url} page={request_data.get('page')}{Tags.ResetAll}")
+                print(f"\n{Tags.LightYellow}Getting data from {url} up to {request_data.get('page')} x 1000 ads{Tags.ResetAll}")
             else:
                 print(f"\n{Tags.LightYellow}Getting data from {url}{Tags.ResetAll}")
         else:
@@ -204,7 +204,7 @@ def get_orders_data(request_data):
     url = "https://api2.myparts.ge/api/en/products/get"
     request_data.update({"pr_type_id": 1})
     if request_data.get("limit") is None:
-        request_data.update({"limit": 100})
+        request_data.update({"limit": 1000})
 
     # Getting all products' ads. There is a pagination, so I use a while loop
     ...
@@ -223,7 +223,7 @@ def get_orders_data(request_data):
             update_key=True
         )
         raw_products_list.extend(json_data["data"]["products"])
-        break
+
 
     # Parsing raw_products_list
     ...
@@ -240,7 +240,7 @@ def get_orders_data(request_data):
     for product in raw_products_list:
         product_dict = {
             "product_id": product.get("product_id"),
-            "title": product.get("lang_data").get("title"),
+            "title": gm.replace_chars(product.get("lang_data").get("title")),
             "cond_type_id": product.get("cond_type_id"),
             "man_id": request_data.get("man_id"),
             "model_id": request_data.get("model_id"),
@@ -404,13 +404,23 @@ def get_parent_categories(categories_df, sub_category_id: int):
     categories_df_list = [x["text"][0] for x in reversed(categories_df_list)]
 
     # Creating DataFrame
+    list_to_df = [sub_category_id, *categories_df_list]
+    if len(list_to_df) < 6:
+        list_to_df.extend(["" for x in range(7 - len(list_to_df))])
     categories_list_df = pd.DataFrame(
-        [[sub_category_id, categories_df_list[0], [666], categories_df_list[-1]]],
-        columns=["cat_id", "main_category", "sub_categories", "product_name"]
+        [list_to_df],
+        columns=["cat_id", "category_01", "category_02", "category_03", "category_04", "category_05", "category_06"]
     )
-    categories_list_df.at[0, "sub_categories"] = categories_df_list[1:-1]
-
     return categories_list_df
+
+
+def categories_names_df(categories_df):
+    df_to_return = pd.DataFrame()
+    for index, row in categories_df.iterrows():
+        row_cats = get_parent_categories(categories_df, row["id"])
+        df_to_return = pd.concat([df_to_return, row_cats], ignore_index=True)
+
+    return df_to_return
 
 
 def replace_df_column(main_df, column_data_df, joint_column_name, columns_to_join: list[str] = None):
@@ -635,7 +645,7 @@ def start_app():
     categories_json = get_categories(main_data_json)
     categories_df = pd.DataFrame(
         categories_json,
-        columns=["id", "parent_id", "text"]
+        # columns=["id", "parent_id", "text"]
     )
 
     # Getting condition types
@@ -666,7 +676,8 @@ def start_app():
         orders_data_json,
     )
 
-    columns_order = ["product_id", "man_name", "model_name", "main_category", "sub_categories", "product_name",
+    columns_order = ["product_id", "man_name", "model_name",
+                     "category_01", "category_02", "category_03", "category_04", "category_05", "category_06",
                      "title", "year_from", "year_to", "cond_type_name", "price_value", "views", "order_date"]
 
     if len(orders_data_df) > 0:
@@ -689,17 +700,12 @@ def start_app():
         else:
             columns_order.remove("model_name")
 
-        # Get all parent categories by children
-
-        categories_list_df = get_parent_categories(categories_df, int(to_csv_df.iloc[0]["cat_id"]))
-        print(categories_list_df)
-        sys.exit()
-
         # Replace Categories
-        to_csv_df = replace_df_column(to_csv_df, categories_list_df, "cat_id")
+        categories_df = categories_names_df(categories_df)
+        columns_to_join = ["category_01", "category_02", "category_03", "category_04", "category_05", "category_06"]
+        to_csv_df = replace_df_column(to_csv_df, categories_df, "cat_id", columns_to_join=columns_to_join)
 
         to_csv_df = to_csv_df[columns_order]
-        # print(to_csv_df)
         save_to_csv(to_csv_df)
         print(f"The details of the orders have been {Tags.LightYellow}{Tags.Reverse}successfully saved{Tags.ResetAll}")
     else:
